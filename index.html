@@ -1,0 +1,436 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Home, 
+  PlusCircle, 
+  History as HistoryIcon, 
+  Trophy, 
+  User, 
+  CheckCircle2, 
+  X,
+  Activity
+} from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer 
+} from 'recharts';
+
+// --- DATOS INICIALES (Los 9 Partidos Exactos del Excel) ---
+const rawData = [
+  { id: 1, fecha: "2026-09-22", ganador: "Rafa", setsRafa: 4, setsJoseRa: 2, parciales: ["11-9", "11-8", "7-11", "8-11", "11-4", "11-9"] },
+  { id: 2, fecha: "2026-09-29", ganador: "Rafa", setsRafa: 4, setsJoseRa: 2, parciales: ["11-6", "8-11", "11-9", "11-7", "6-11", "11-9"] },
+  { id: 3, fecha: "2026-10-01", ganador: "Rafa", setsRafa: 4, setsJoseRa: 0, parciales: ["11-9", "11-7", "11-7", "11-9"] },
+  { id: 4, fecha: "2026-10-06", ganador: "Rafa", setsRafa: 4, setsJoseRa: 0, parciales: ["11-8", "11-4", "11-8", "11-6"] },
+  { id: 5, fecha: "2026-10-08", ganador: "JoseRa", setsRafa: 2, setsJoseRa: 4, parciales: ["7-11", "11-7", "8-11", "9-11", "11-8", "9-11"] },
+  { id: 6, fecha: "2026-10-13", ganador: "Rafa", setsRafa: 4, setsJoseRa: 1, parciales: ["12-10", "11-7", "11-5", "8-11", "11-7"] },
+  { id: 7, fecha: "2026-10-20", ganador: "JoseRa", setsRafa: 1, setsJoseRa: 4, parciales: ["9-11", "10-12", "11-6", "8-11", "8-11"] },
+  { id: 8, fecha: "2026-10-22", ganador: "Rafa", setsRafa: 4, setsJoseRa: 2, parciales: ["10-12", "6-11", "11-7", "12-10", "11-6"] },
+  { id: 9, fecha: "2026-10-27", ganador: "Rafa", setsRafa: 4, setsJoseRa: 2, parciales: ["9-11", "11-4", "11-8", "6-11", "11-6"] }
+];
+
+// Mapeo y ordenación (del más reciente al más antiguo)
+const INITIAL_MATCHES = rawData.map(m => {
+  const scores = m.parciales.map(p => {
+    const [r, j] = p.split('-');
+    return { r: parseInt(r), j: parseInt(j) };
+  });
+  
+  return {
+    id: m.id.toString(),
+    date: m.fecha,
+    winner: m.ganador,
+    setsRafa: m.setsRafa,
+    setsJoseRa: m.setsJoseRa,
+    pointsRafa: m.setsRafa === 4 ? 1 : 0,
+    pointsJoseRa: m.setsJoseRa === 4 ? 1 : 0,
+    scores: scores
+  };
+}).reverse();
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [matches, setMatches] = useState(INITIAL_MATCHES);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Auto-ocultar mensajes
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  const handleSaveMatch = (newMatch) => {
+    setMatches([newMatch, ...matches]);
+    setToastMessage('¡Partido guardado con éxito!');
+    setActiveTab('dashboard');
+  };
+
+  return (
+    <div className="flex justify-center w-full bg-gray-900 font-sans text-gray-800 selection:bg-indigo-200">
+      {/* Contenedor Principal (100dvh estricto, Flex-Col) */}
+      <div 
+        className="w-full max-w-md bg-gray-50 flex flex-col shadow-2xl relative overflow-hidden"
+        style={{ 
+          height: '100dvh', 
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)'
+        }}
+      >
+        
+        {/* Cabecera Fija */}
+        <header className="bg-indigo-600 text-white p-4 shadow-md shrink-0 flex items-center justify-between z-20 relative">
+          <div className="flex items-center gap-2">
+            <Activity className="w-6 h-6" />
+            <h1 className="text-xl font-bold tracking-wide">SquashLiga</h1>
+          </div>
+          <span className="text-indigo-200 text-sm font-medium">Rafa vs JoseRa</span>
+        </header>
+
+        {/* Notificación Flotante */}
+        {toastMessage && (
+          <div className="absolute top-20 left-4 right-4 bg-emerald-600 text-white p-3 rounded-lg shadow-lg flex items-center justify-between z-50 animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-medium">{toastMessage}</span>
+            </div>
+            <button onClick={() => setToastMessage('')} className="text-white/80 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Área de Contenido (Flex: 1, Overflow Auto) */}
+        <main className="flex-1 overflow-y-auto bg-gray-100 relative">
+          <div className="p-4 pb-8 min-h-full">
+            {activeTab === 'dashboard' && <Dashboard matches={matches} />}
+            {activeTab === 'add' && <AddMatch onSave={handleSaveMatch} onCancel={() => setActiveTab('dashboard')} />}
+            {activeTab === 'history' && <MatchHistory matches={matches} />}
+          </div>
+        </main>
+
+        {/* Navegación Inferior Fija */}
+        <nav className="bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 z-20">
+          <div className="flex justify-around items-center h-16">
+            <NavItem 
+              icon={<Home />} label="Inicio" 
+              isActive={activeTab === 'dashboard'} 
+              onClick={() => setActiveTab('dashboard')} 
+            />
+            <NavItem 
+              icon={<PlusCircle className="w-7 h-7" />} label="Añadir" 
+              isActive={activeTab === 'add'} 
+              onClick={() => setActiveTab('add')} 
+              isPrimary
+            />
+            <NavItem 
+              icon={<HistoryIcon />} label="Partidos" 
+              isActive={activeTab === 'history'} 
+              onClick={() => setActiveTab('history')} 
+            />
+          </div>
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+// --- SUBCOMPONENTES ---
+
+function NavItem({ icon, label, isActive, onClick, isPrimary }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
+        isActive ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-400'
+      }`}
+    >
+      <div className={`${isPrimary ? 'bg-indigo-600 text-white p-2.5 rounded-full shadow-md mb-1 -mt-6 border-4 border-white' : ''}`}>
+        {React.cloneElement(icon, { className: isPrimary ? 'w-6 h-6' : 'w-5 h-5 mb-1' })}
+      </div>
+      {!isPrimary && <span className="text-[10px] font-semibold tracking-wider uppercase">{label}</span>}
+    </button>
+  );
+}
+
+function Dashboard({ matches }) {
+  const stats = useMemo(() => {
+    const s = {
+      Rafa: { points: 0, setsWon: 0 },
+      JoseRa: { points: 0, setsWon: 0 }
+    };
+    
+    matches.forEach(m => {
+      s.Rafa.points += m.pointsRafa;
+      s.JoseRa.points += m.pointsJoseRa;
+      s.Rafa.setsWon += m.setsRafa;
+      s.JoseRa.setsWon += m.setsJoseRa;
+    });
+    
+    return s;
+  }, [matches]);
+
+  const chartData = [
+    { name: 'Rafa', Puntos: stats.Rafa.points, SetsTotales: stats.Rafa.setsWon },
+    { name: 'JoseRa', Puntos: stats.JoseRa.points, SetsTotales: stats.JoseRa.setsWon }
+  ];
+
+  return (
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+      <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+        <Trophy className="text-yellow-500 w-6 h-6" />
+        Clasificación General
+      </h2>
+      
+      {/* Tarjetas de Jugadores */}
+      <div className="grid grid-cols-2 gap-4">
+        <PlayerCard name="Rafa" stats={stats.Rafa} color="bg-blue-50 text-blue-800" borderColor="border-blue-200" />
+        <PlayerCard name="JoseRa" stats={stats.JoseRa} color="bg-amber-50 text-amber-800" borderColor="border-amber-200" />
+      </div>
+
+      {/* Gráfico */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 mt-6">
+        <h3 className="text-sm font-bold text-gray-700 mb-4 text-center uppercase tracking-wide">Puntos vs Sets (Desempate)</h3>
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontWeight: 'bold', fill: '#4b5563'}} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+              <Tooltip 
+                cursor={{fill: '#f3f4f6'}}
+                contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+              />
+              <Legend wrapperStyle={{ paddingTop: '15px', fontSize: '12px' }} />
+              <Bar dataKey="Puntos" fill="#4F46E5" radius={[6, 6, 0, 0]} name="Puntos de Liga" barSize={35} />
+              <Bar dataKey="SetsTotales" fill="#10B981" radius={[6, 6, 0, 0]} name="Sets Acumulados" barSize={35} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlayerCard({ name, stats, color, borderColor }) {
+  return (
+    <div className={`p-4 rounded-2xl border ${borderColor} ${color} flex flex-col items-center justify-center shadow-sm relative overflow-hidden`}>
+      <div className="absolute -right-3 -top-3 opacity-10">
+        <User className="w-20 h-20" />
+      </div>
+      <h3 className="text-lg font-black z-10">{name}</h3>
+      <div className="mt-3 flex gap-3 w-full justify-center z-10">
+        <div className="text-center">
+          <p className="text-[10px] uppercase font-bold opacity-70 leading-tight">Puntos</p>
+          <p className="text-3xl font-black">{stats.points}</p>
+        </div>
+        <div className="w-px bg-current opacity-20"></div>
+        <div className="text-center">
+          <p className="text-[10px] uppercase font-bold opacity-70 leading-tight">Sets</p>
+          <p className="text-xl font-bold mt-1">{stats.setsWon}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatchHistory({ matches }) {
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="flex justify-between items-center mb-2">
+        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <HistoryIcon className="text-indigo-500 w-6 h-6" />
+          Historial
+        </h2>
+        <span className="text-sm font-medium bg-gray-200 text-gray-600 px-3 py-1 rounded-full">{matches.length} Jugados</span>
+      </div>
+      
+      {matches.map((match, index) => (
+        <div key={match.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col gap-3 relative overflow-hidden transition-all hover:shadow-md">
+           <div className="absolute top-0 left-0 bg-gray-100 text-gray-400 text-[9px] font-bold px-2 py-1 rounded-br-lg">
+             #{matches.length - index}
+           </div>
+
+           <div className="flex justify-between items-center border-b border-gray-100 pb-2 mt-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                {new Date(match.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' })}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider flex items-center gap-1 ${match.winner === 'Rafa' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                <Trophy className="w-3 h-3" />
+                Ganador: {match.winner}
+              </span>
+           </div>
+           
+           <div className="flex items-center justify-between px-2">
+             <div className="text-center w-[30%]">
+               <p className={`font-bold text-base ${match.winner === 'Rafa' ? 'text-blue-600' : 'text-gray-500'}`}>Rafa</p>
+               <p className="text-3xl font-black text-gray-800">{match.setsRafa}</p>
+             </div>
+             
+             <div className="text-center w-[40%] flex flex-col items-center">
+               <span className="text-[10px] text-gray-400 font-bold mb-1.5 uppercase tracking-widest">Tanteos</span>
+               <div className="flex flex-col gap-1 w-full max-w-[80px]">
+                 {match.scores.map((set, i) => (
+                   <div key={i} className="flex justify-between text-xs bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                     <span className={set.r > set.j ? 'font-bold text-gray-800' : 'text-gray-400'}>{set.r}</span>
+                     <span className="text-gray-300 mx-1">-</span>
+                     <span className={set.j > set.r ? 'font-bold text-gray-800' : 'text-gray-400'}>{set.j}</span>
+                   </div>
+                 ))}
+               </div>
+             </div>
+
+             <div className="text-center w-[30%]">
+               <p className={`font-bold text-base ${match.winner === 'JoseRa' ? 'text-amber-600' : 'text-gray-500'}`}>JoseRa</p>
+               <p className="text-3xl font-black text-gray-800">{match.setsJoseRa}</p>
+             </div>
+           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AddMatch({ onSave, onCancel }) {
+  const [sets, setSets] = useState(Array(7).fill({ r: '', j: '' }));
+  const [error, setError] = useState('');
+
+  const currentScores = useMemo(() => {
+    let setsRafa = 0;
+    let setsJoseRa = 0;
+    
+    sets.forEach(set => {
+      const r = parseInt(set.r);
+      const j = parseInt(set.j);
+      if (!isNaN(r) && !isNaN(j) && r !== j) {
+        if (r > j) setsRafa++;
+        else setsJoseRa++;
+      }
+    });
+
+    return { setsRafa, setsJoseRa, matchOver: setsRafa === 4 || setsJoseRa === 4 };
+  }, [sets]);
+
+  const updateSet = (index, player, value) => {
+    if (value !== '' && !/^\d+$/.test(value)) return; // Solo números
+    const newSets = [...sets];
+    newSets[index] = { ...newSets[index], [player]: value };
+    setSets(newSets);
+    setError('');
+  };
+
+  const handleSave = () => {
+    if (!currentScores.matchOver) {
+      setError('El partido debe terminar cuando alguien gane 4 sets.');
+      return;
+    }
+    const validSets = sets.filter(s => s.r !== '' && s.j !== '');
+    const invalidSet = validSets.find(s => parseInt(s.r) === parseInt(s.j));
+    if (invalidSet) {
+      setError('Hay un set empatado. Revisa los tanteos.');
+      return;
+    }
+
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const newMatch = {
+      id: Date.now().toString(),
+      date: dateStr,
+      setsRafa: currentScores.setsRafa,
+      setsJoseRa: currentScores.setsJoseRa,
+      pointsRafa: currentScores.setsRafa === 4 ? 1 : 0,
+      pointsJoseRa: currentScores.setsJoseRa === 4 ? 1 : 0,
+      winner: currentScores.setsRafa === 4 ? 'Rafa' : 'JoseRa',
+      scores: validSets.map(s => ({ r: parseInt(s.r), j: parseInt(s.j) }))
+    };
+
+    onSave(newMatch);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold text-gray-800">Registrar Partido</h2>
+        <button onClick={onCancel} className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 rounded-full transition-colors">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Marcador Global en Tiempo Real */}
+      <div className="flex justify-center items-center gap-6 mb-4 bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-inner">
+        <div className="text-center w-20">
+          <p className="font-bold text-blue-600 uppercase text-[10px] tracking-wider mb-1">Rafa</p>
+          <p className="text-4xl font-black text-gray-800">{currentScores.setsRafa}</p>
+        </div>
+        <div className="flex flex-col items-center">
+          <span className="text-gray-300 text-3xl font-black">-</span>
+          <span className="text-[9px] text-gray-400 font-bold uppercase mt-1 tracking-widest">Sets</span>
+        </div>
+        <div className="text-center w-20">
+          <p className="font-bold text-amber-600 uppercase text-[10px] tracking-wider mb-1">JoseRa</p>
+          <p className="text-4xl font-black text-gray-800">{currentScores.setsJoseRa}</p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 font-medium flex items-start gap-2">
+          <X className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Inputs de los Sets */}
+      <div className="space-y-2">
+        {sets.map((set, index) => {
+          const isDisabled = currentScores.matchOver && set.r === '' && set.j === '';
+          return (
+            <div key={index} className={`flex items-center gap-3 p-1.5 rounded-xl transition-all duration-300 ${isDisabled ? 'opacity-30 pointer-events-none' : 'bg-white border border-gray-200 shadow-sm'}`}>
+              <span className="w-12 text-[10px] font-bold text-gray-400 uppercase text-center">Set {index + 1}</span>
+              
+              <input
+                type="tel" inputMode="numeric" placeholder="0" value={set.r}
+                onChange={(e) => updateSet(index, 'r', e.target.value)}
+                className={`w-full text-center text-lg font-bold py-2 px-1 rounded-lg border-2 outline-none transition-colors ${
+                  set.r !== '' && set.r > set.j ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-transparent focus:border-indigo-400 bg-gray-50'
+                }`}
+              />
+              <span className="text-gray-300 font-bold text-sm">-</span>
+              <input
+                type="tel" inputMode="numeric" placeholder="0" value={set.j}
+                onChange={(e) => updateSet(index, 'j', e.target.value)}
+                className={`w-full text-center text-lg font-bold py-2 px-1 rounded-lg border-2 outline-none transition-colors ${
+                  set.j !== '' && set.j > set.r ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-transparent focus:border-indigo-400 bg-gray-50'
+                }`}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Botón de Guardado */}
+      <div className="mt-6 pt-4 border-t border-gray-100 pb-2">
+        <button
+          onClick={handleSave}
+          disabled={!currentScores.matchOver}
+          className={`w-full py-4 rounded-xl font-bold text-lg shadow-md transition-all flex items-center justify-center gap-2 ${
+            currentScores.matchOver 
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98]' 
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {currentScores.matchOver ? (
+            <><CheckCircle2 className="w-5 h-5" /> Guardar Victoria ({currentScores.setsRafa === 4 ? 'Rafa' : 'JoseRa'})</>
+          ) : (
+            'Faltan sets para el final'
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
